@@ -10,51 +10,55 @@ namespace TalkToDb.MCPServer.Tools
         {
         [McpServerTool(Name = "execute-sql-query")]
         [Description("Execute given select query only against database and return data.")]
-        public static async Task<IEnumerable<TableSchema>> ListDbTablesSchema(IConfiguration configuration)
+        public static async Task<object?> ExecuteSqlQuery(string sqlQuery, IConfiguration configuration)
             {
-            // list_db_tables_schema
+            // execute_sql_query
+
+            if (!sqlQuery.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Only SELECT queries can be executed");
+
             var connectionString = configuration.GetConnectionString("Default");
 
             using var sqlConnection = new SqlConnection(connectionString);
+
             try
                 {
                 using var sqlCommand = sqlConnection.CreateCommand();
-                sqlCommand.CommandText = @"
-            SELECT t.TABLE_SCHEMA, t.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, c.CHARACTER_MAXIMUM_LENGTH, 
-	            CASE c.IS_NULLABLE 
-		            WHEN 'NO' THEN CAST(0 AS BIT)
-		            ELSE  CAST(1 AS BIT) 
-	            END AS IsNullable
-            FROM INFORMATION_SCHEMA.TABLES t
-            JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_NAME = c.TABLE_NAME AND t.TABLE_SCHEMA = c.TABLE_SCHEMA
-            WHERE t.TABLE_TYPE = 'BASE TABLE'
-            ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME
-            ";
+                sqlCommand.CommandText = sqlQuery;
 
-                var tableSchemaList = new List<TableSchema>();
                 await sqlConnection.OpenAsync();
+
                 using var dataReader = await sqlCommand.ExecuteReaderAsync();
-                while (await dataReader.ReadAsync())
+
+                //var columnNames = Enumerable.Range(0, dataReader.FieldCount).Select(i => dataReader.GetName(i));
+
+                List<string> columnNames = [];
+                for (int i = 0; i < dataReader.FieldCount; i++)
                     {
-                    var tableSchema = new TableSchema
-                        {
-                        Schema = dataReader.GetString(0),
-                        TableName = dataReader.GetString(1),
-                        ColumnName = dataReader.GetString(2),
-                        DataType = dataReader.GetString(3),
-                        CharacterLength = dataReader.IsDBNull(4) ? null : dataReader.GetInt32(4),
-                        IsNullable = dataReader.GetBoolean(5),
-                        };
-                    tableSchemaList.Add(tableSchema);
+                    var columnName = dataReader.GetName(i);
+                    columnNames.Add(columnName);
                     }
 
-                return tableSchemaList;
+                var rows = new List<Dictionary<string, object?>>();
+
+                while (await dataReader.ReadAsync())
+                    {
+                    var row = new Dictionary<string, object?>();
+                    foreach (var columnName in columnNames)
+                        {
+                        var value = dataReader[columnName];
+                        row[columnName] = value == DBNull.Value ? null : value;
+                        }
+
+                    rows.Add(row);
+                    }
+
+                return new { Columns = columnNames, Rows = rows };
                 }
             catch (Exception)
                 {
-                // Log exception
-                //throw;
-                return [];
+                // log ex
+                return null;
                 }
             finally
                 {
@@ -62,15 +66,5 @@ namespace TalkToDb.MCPServer.Tools
                     await sqlConnection.CloseAsync();
                 }
             }
-
-        }
-    public class TableSchema
-        {
-        public string Schema { get; set; } // dbo.
-        public string TableName { get; set; }
-        public string ColumnName { get; set; }
-        public string DataType { get; set; }
-        public int? CharacterLength { get; set; }
-        public bool IsNullable { get; set; }
         }
     }
