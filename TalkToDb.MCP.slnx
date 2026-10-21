@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="TalkToDb.Api/TalkToDb.Api.csproj" />
+  <Project Path="TalkToDb.MCPServer/TalkToDb.MCPServer.csproj" />
+  <Project Path="TalkToDb.Shared/TalkToDb.Shared.csproj" />
+</Solution>

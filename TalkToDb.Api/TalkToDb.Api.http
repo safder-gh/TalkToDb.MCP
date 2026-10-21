@@ -1,0 +1,6 @@
+@TalkToDb.Api_HostAddress = http://localhost:5132
+
+GET {{TalkToDb.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
