@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
+using System.Text.Json;
+using TalkToDb.Shared;
 
 namespace TalkToDb.Api
     {
@@ -41,25 +43,59 @@ namespace TalkToDb.Api
            - Return: { ""sqlQuery"": null, ""errorMessage"": ""Schema information missing."", ""isSuccess"": false, ""result"": null, ""message"": ""Schema information is missing."", ""resultType"": ""None"" }
 
     ";
-        public static IEndpointRouteBuilder MapAppEndpoints(this IEndpointRouteBuilder endpoints,McpClient mcpClient)
+        public static IEndpointRouteBuilder MapAppEndpoints(this IEndpointRouteBuilder app, McpClient mcpClient)
             {
-            endpoints.MapGet("/ask", async (string query,IChatClient chatClient) =>
+            app.MapGet("/ask", async (string q, IChatClient chatClient) =>
             {
-                if(string.IsNullOrWhiteSpace(query))
-                    {
-                    return Results.BadRequest("Query cannot be empty.");
-                    }
+                if (string.IsNullOrWhiteSpace(q))
+                    return Results.BadRequest("Quesion is required");
+
                 var tools = await mcpClient.ListToolsAsync();
+
                 var chatOptions = new ChatOptions
                     {
-                    Tools = [..tools]
+                    Tools = [.. tools]
                     };
-                var systemMessage = new ChatMessage(ChatRole.System, _systemPrompt);
-                var userMessage = new ChatMessage(ChatRole.User, query);
-                var result = await chatClient.GetResponseAsync([systemMessage, userMessage], chatOptions);
-                return Results.Ok(result.Text);
+
+                var system = new ChatMessage(ChatRole.System, _systemPrompt);
+                var question = new ChatMessage(ChatRole.User, q);
+
+                var result = await chatClient.GetResponseAsync([system, question], chatOptions);
+
+                QueryResult queryResult;
+
+                if (string.IsNullOrWhiteSpace(result.Text))
+                    {
+                    queryResult = new()
+                        {
+                        IsSuccess = false,
+                        ErrorMessage = "Could not get any response"
+                        };
+                    }
+                else
+                    {
+                    try
+                        {
+                        queryResult = JsonSerializer.Deserialize<QueryResult>(result.Text, Utils.JsonSerializerOptions)
+                        ?? new()
+                            {
+                            IsSuccess = false,
+                            ErrorMessage = "Invalid response"
+                            };
+                        }
+                    catch (Exception ex)
+                        {
+                        queryResult = new()
+                            {
+                            IsSuccess = false,
+                            ErrorMessage = ex.Message
+                            };
+                        }
+                    }
+
+                return Results.Ok(queryResult);
             });
-            return endpoints;
+            return app;
             }
         }
     }
