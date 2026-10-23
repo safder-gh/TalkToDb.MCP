@@ -1,4 +1,5 @@
 <Solution>
+  <Folder Name="/UI/" />
   <Project Path="TalkToDb.Api/TalkToDb.Api.csproj" />
   <Project Path="TalkToDb.MCPServer/TalkToDb.MCPServer.csproj" />
   <Project Path="TalkToDb.Shared/TalkToDb.Shared.csproj" />

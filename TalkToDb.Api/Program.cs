@@ -5,7 +5,16 @@ using System.ClientModel;
 using TalkToDb.Api;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AngularApp", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddOpenApi();
 var apiKey = builder.Configuration["OpenApi:ApiKey"];
 var apiUrl = builder.Configuration["OpenApi:ApiUrl"];
@@ -40,7 +49,7 @@ if (app.Environment.IsDevelopment())
     {
     app.MapOpenApi();
     }
-
+app.UseCors("AngularApp");
 app.UseHttpsRedirection();
 app.MapAppEndpoints(mcpClient);
 app.Run();
